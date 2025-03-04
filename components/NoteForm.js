@@ -2,6 +2,7 @@ class NoteForm extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+        this.isLoading = false;
     }
 
     connectedCallback() {
@@ -55,9 +56,42 @@ class NoteForm extends HTMLElement {
                     border-radius: 4px;
                     cursor: pointer;
                     font-size: 1rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-width: 150px;
                 }
-                button:hover {
+                button:hover:not(:disabled) {
                     background-color: #34495e;
+                }
+                button:disabled {
+                    background-color: #95a5a6;
+                    cursor: not-allowed;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                .loading-spinner {
+                    width: 20px;
+                    height: 20px;
+                    border: 3px solid #ffffff;
+                    border-top: 3px solid transparent;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin-right: 8px;
+                    display: none;
+                }
+                .loading .loading-spinner {
+                    display: inline-block;
+                }
+                .form-controls {
+                    display: flex;
+                    justify-content: flex-end;
+                }
+                input:disabled, textarea:disabled {
+                    background-color: #f5f6f7;
+                    cursor: not-allowed;
                 }
             </style>
             <form class="note-form">
@@ -71,9 +105,37 @@ class NoteForm extends HTMLElement {
                     <textarea id="body" required minlength="10"></textarea>
                     <div class="error">Content must be at least 10 characters long</div>
                 </div>
-                <button type="submit">Add Note</button>
+                <div class="form-controls">
+                    <button type="submit">
+                        <span class="loading-spinner"></span>
+                        <span class="button-text">Add Note</span>
+                    </button>
+                </div>
             </form>
         `;
+    }
+
+    setLoading(loading) {
+        this.isLoading = loading;
+        const form = this.shadowRoot.querySelector('form');
+        const button = this.shadowRoot.querySelector('button');
+        const titleInput = this.shadowRoot.querySelector('#title');
+        const bodyInput = this.shadowRoot.querySelector('#body');
+        const buttonText = this.shadowRoot.querySelector('.button-text');
+
+        if (loading) {
+            button.classList.add('loading');
+            buttonText.textContent = 'Saving...';
+            button.disabled = true;
+            titleInput.disabled = true;
+            bodyInput.disabled = true;
+        } else {
+            button.classList.remove('loading');
+            buttonText.textContent = 'Add Note';
+            button.disabled = false;
+            titleInput.disabled = false;
+            bodyInput.disabled = false;
+        }
     }
 
     setupListeners() {
@@ -94,20 +156,29 @@ class NoteForm extends HTMLElement {
         titleInput.addEventListener('input', () => validateInput(titleInput, 3));
         bodyInput.addEventListener('input', () => validateInput(bodyInput, 10));
 
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (validateInput(titleInput, 3) && validateInput(bodyInput, 10)) {
+                // Set loading state
+                this.setLoading(true);
+
+                // Artificial delay to show loading state (1 second)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 const event = new CustomEvent('note-submitted', {
                     bubbles: true,
                     composed: true,
                     detail: {
                         title: titleInput.value,
                         body: bodyInput.value,
-                        createdAt: new Date().toISOString()
                     }
                 });
                 this.dispatchEvent(event);
                 form.reset();
+
+                // Additional delay before removing loading state
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.setLoading(false);
             }
         });
     }
